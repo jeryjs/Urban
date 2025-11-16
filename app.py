@@ -5,7 +5,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import joblib
 import os
+from itertools import product
+from typing import List
+
 from generate_data import generate_full_dataset, CROP_PROFILES, generate_single_crop
+from groq_playbooks import PlaybookRequest, fetch_playbooks, GroqPlaybookError
 from train_model import preprocess, load_data, DATA_FILE, IRR_MODEL_FILE, GROWTH_MODEL_FILE
 
 st.set_page_config(page_title="AI Urban Farming Dashboard", page_icon="🌱", layout="wide")
@@ -167,3 +171,128 @@ with st.expander("Show simulated dataset (first 50 rows)"):
     st.dataframe(df.head(50))
 
 st.success("Dashboard ready. Tip: Use sidebar to re-simulate data or train models.")
+
+
+# ==========================
+# Groq Scenario Universe
+# ==========================
+
+st.markdown("---")
+st.header("🧠 AI Scenario Universe")
+st.write(
+    "Structured-output generator powered by Groq's `openai/gpt-oss-120b` to explode the design space."
+)
+
+variant_cap = st.slider("Variants per track", 3, 12, 6)
+emphasis_options = {
+    "irrigation_playbooks": "Water-saving blueprints",
+    "nutrient_programs": "Panchgavya/Jeevamrut loops",
+    "lighting_profiles": "Photon strategies",
+    "resilience_protocols": "Contingency drills",
+    "commercial_blueprints": "Go-to-market",
+    "learning_modules": "Education kits",
+}
+emphasis_select = st.multiselect(
+    "Emphasize tracks",
+    options=list(emphasis_options.keys()),
+    format_func=lambda k: emphasis_options[k],
+    default=list(emphasis_options.keys())[:3],
+)
+
+context_snippet = (
+    f"Day {int(row['day'])} → moisture {row['moisture']}%, nutrients {row['nutrients']}, "
+    f"light {row['light_hours']}h, temp {row['temperature']}°C. Organic cadence: {panch}, {jeev}."
+)
+
+
+@st.cache_data(show_spinner=True, ttl=3600)
+def cached_playbooks(crop_name: str, context: str, cap: int, emphasis: tuple):
+    req = PlaybookRequest(
+        crop=crop_name,
+        organic_context=context,
+        variant_cap=cap,
+        emphasize=list(emphasis),
+    )
+    return fetch_playbooks(req)
+
+
+trigger = st.button("Generate AI scenario universe", type="primary")
+
+if trigger:
+    try:
+        groq_payload = cached_playbooks(crop_choice, context_snippet, variant_cap, tuple(emphasis_select))
+        st.session_state["groq_payload"] = groq_payload
+        st.success("Groq catalog updated ✔️")
+    except GroqPlaybookError as err:
+        st.error(str(err))
+    except Exception as err:  # fail fast but inform
+        st.error(f"Groq generation failed: {err}")
+
+
+def _maybe_payload():
+    return st.session_state.get("groq_payload")
+
+
+payload = _maybe_payload()
+
+if payload:
+    st.subheader("📚 Narrative")
+    st.write(payload["meta"]["narrative"])
+    st.info(
+        f"Variant target: {payload['meta']['variant_target']} | Crop: {payload['meta']['crop']} | Emphasis: {', '.join(emphasis_select) or 'All'}"
+    )
+
+    def render_table(key: str, label: str):
+        entries = payload.get(key, [])
+        if not entries:
+            st.warning(f"No data for {label}")
+            return
+        st.markdown(f"#### {label}")
+        st.dataframe(pd.DataFrame(entries), width="stretch", hide_index=True)
+
+    render_table("irrigation_playbooks", "💧 Irrigation playbooks")
+    render_table("nutrient_programs", "🧪 Nutrient programs")
+    render_table("lighting_profiles", "☀️ Lighting profiles")
+    render_table("resilience_protocols", "🛡️ Resilience protocols")
+    render_table("commercial_blueprints", "💼 Commercial blueprints")
+    render_table("learning_modules", "📘 Learning modules")
+
+    st.markdown("#### 🔗 Cross-linkages")
+    for link in payload.get("cross_linkages", []):
+        with st.expander(link["title"]):
+            st.write(link["rationale"])
+            st.write(
+                "Linked assets: "
+                + ", ".join(f"{asset['category']} → {asset['name']}" for asset in link["linked_assets"])
+            )
+
+    combo_options = list(emphasis_options.keys())
+    combo_select = st.multiselect(
+        "Select tracks to explode combinations",
+        options=combo_options,
+        default=combo_options[:3],
+        key="combo_select",
+    )
+
+    if len(combo_select) >= 2:
+        matrices: List[List[str]] = []
+        for cat in combo_select:
+            entries = payload.get(cat, [])
+            matrices.append([entry["name"] for entry in entries])
+        total = 1
+        for arr in matrices:
+            total *= max(1, len(arr))
+        cap = 400
+        combos_iter = product(*matrices)
+        rows = []
+        for idx, combo in enumerate(combos_iter):
+            if idx >= cap:
+                break
+            rows.append(combo)
+        df_combo = pd.DataFrame(rows, columns=[emphasis_options[c] for c in combo_select])
+        st.markdown(f"##### Combination grid ({len(rows)} shown / {total} total theoretical)")
+        st.dataframe(df_combo, width="stretch", hide_index=True)
+        if total > cap:
+            st.caption("Truncated to 400 combos to keep Streamlit responsive.")
+else:
+    st.info("Generate a Groq scenario universe to unlock the combinatorial explorer.")
