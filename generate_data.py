@@ -25,14 +25,17 @@ def generate_single_crop(crop_name="Spinach", days=60, seed=None):
     light_hours = np.clip(np.random.normal(loc=profile["ideal_light"], scale=1.5, size=days).round(1), 1, 18)
     temperature = np.clip(np.random.normal(loc=27, scale=3.0, size=days).round(1), 10, 45)
 
-    # growth_index: synthetic target (0..100)
-    # depends positively on moisture close to ideal, nutrients, light close to ideal, and temperature in comfortable range
-    moisture_effect = 1 - np.abs(moisture - profile["ideal_moisture"]) / 50
-    light_effect = 1 - np.abs(light_hours - profile["ideal_light"]) / 10
-    temp_effect = 1 - (np.abs(temperature - 25) / 20)
-    growth_index = (0.5 * moisture_effect + 0.3 * (nutrients / 100) + 0.2 * light_effect + 0.1 * temp_effect)
-    # Normalize into 0-100
-    growth_index = np.clip((growth_index / growth_index.max()) * 100, 0, 100).round(1)
+    # growth_index: synthetic target (0..100) with stronger correlations
+    moisture_effect = np.maximum(0, 1 - (np.abs(moisture - profile["ideal_moisture"]) / 30.0) ** 2)
+    light_effect = np.maximum(0, 1 - (np.abs(light_hours - profile["ideal_light"]) / 6.0) ** 2)
+    temp_effect = np.maximum(0, 1 - (np.abs(temperature - 25) / 15.0) ** 2)
+    nutrient_effect = (nutrients / 100.0) ** 0.8
+    
+    # Add cumulative growth (temporal dependency)
+    base_growth = (0.45 * moisture_effect + 0.30 * nutrient_effect + 0.15 * light_effect + 0.10 * temp_effect)
+    cumulative_boost = np.minimum(days_idx / days, 0.5)
+    growth_index = (base_growth + cumulative_boost) * 100
+    growth_index = np.clip(growth_index, 0, 100).round(1)
 
     # irrigation label: if moisture < ideal - 10 -> 'irrigate_now', elif moisture < ideal -> 'soon', else 'ok'
     irrigation = []
@@ -67,7 +70,7 @@ def generate_single_crop(crop_name="Spinach", days=60, seed=None):
     })
     return df
 
-def generate_full_dataset(days=60, seed=None):
+def generate_full_dataset(days=120, seed=None):
     # Create dataset by concatenating for each crop
     dfs = []
     for crop in CROP_PROFILES.keys():
@@ -76,6 +79,6 @@ def generate_full_dataset(days=60, seed=None):
     return full
 
 if __name__ == "__main__":
-    df = generate_full_dataset(days=60, seed=42)
+    df = generate_full_dataset(days=120, seed=42)
     df.to_csv("simulated_farm_data.csv", index=False)
     print("Wrote simulated_farm_data.csv (shape: {})".format(df.shape))

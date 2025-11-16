@@ -324,4 +324,184 @@ def fetch_playbooks(req: PlaybookRequest) -> Dict[str, Any]:
     return json.loads(raw)
 
 
-__all__ = ["fetch_playbooks", "PlaybookRequest", "GroqPlaybookError", "SUPPORTED_MODEL"]
+def fetch_diagnosis(crop: str, moisture: float, nutrients: float, light: float, temp: float, growth: float) -> Dict[str, Any]:
+    """Generate AI-powered crop health diagnosis with actionable recommendations."""
+    client = _client()
+    schema = {
+        "type": "object",
+        "properties": {
+            "health_status": {"type": "string", "enum": ["optimal", "good", "warning", "critical"]},
+            "confidence": {"type": "number"},
+            "risk_factors": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "factor": {"type": "string"},
+                        "severity": {"type": "string", "enum": ["low", "medium", "high"]},
+                        "description": {"type": "string"}
+                    },
+                    "required": ["factor", "severity", "description"],
+                    "additionalProperties": False
+                },
+                "minItems": 1,
+                "maxItems": 5
+            },
+            "interventions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "action": {"type": "string"},
+                        "priority": {"type": "string", "enum": ["immediate", "within_24h", "within_week"]},
+                        "organic_inputs": {"type": "array", "items": {"type": "string"}},
+                        "expected_impact": {"type": "string"}
+                    },
+                    "required": ["action", "priority", "organic_inputs", "expected_impact"],
+                    "additionalProperties": False
+                },
+                "minItems": 2,
+                "maxItems": 6
+            },
+            "pest_disease_risk": {"type": "string"},
+            "explanation": {"type": "string"}
+        },
+        "required": ["health_status", "confidence", "risk_factors", "interventions", "pest_disease_risk", "explanation"],
+        "additionalProperties": False
+    }
+    
+    prompt = f"""Analyze this urban farm crop reading for {crop}:
+- Moisture: {moisture}%
+- Nutrients: {nutrients}
+- Light: {light} hours/day
+- Temperature: {temp}°C
+- Current growth index: {growth}/100
+
+Provide diagnostic assessment with Indian organic farming interventions (Panchgavya, Jeevamrut, neem, etc.)."""
+    
+    response = client.chat.completions.create(
+        model=SUPPORTED_MODEL,
+        temperature=0.25,
+        max_completion_tokens=1200,
+        response_format={"type": "json_schema", "json_schema": {"name": "diagnosis", "schema": schema}},
+        messages=[{"role": "user", "content": prompt}]
+    )
+    raw = response.choices[0].message.content
+    if not raw:
+        raise GroqPlaybookError("Diagnosis response missing")
+    return json.loads(raw)
+
+
+def fetch_yield_forecast(crop: str, days_elapsed: int, growth_trajectory: List[float]) -> Dict[str, Any]:
+    """Generate AI-powered yield forecast with confidence intervals."""
+    client = _client()
+    schema = {
+        "type": "object",
+        "properties": {
+            "projected_yield_kg": {"type": "number"},
+            "confidence_interval": {
+                "type": "object",
+                "properties": {
+                    "low": {"type": "number"},
+                    "high": {"type": "number"}
+                },
+                "required": ["low", "high"],
+                "additionalProperties": False
+            },
+            "harvest_readiness": {"type": "string", "enum": ["immature", "developing", "near_ready", "optimal", "overripe"]},
+            "quality_grade": {"type": "string", "enum": ["premium", "grade_a", "grade_b", "standard"]},
+            "market_value_inr": {"type": "number"},
+            "risk_adjustments": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 1,
+                "maxItems": 4
+            },
+            "recommendation": {"type": "string"}
+        },
+        "required": ["projected_yield_kg", "confidence_interval", "harvest_readiness", "quality_grade", "market_value_inr", "risk_adjustments", "recommendation"],
+        "additionalProperties": False
+    }
+    
+    trajectory_str = ", ".join(f"{v:.1f}" for v in growth_trajectory[-10:])
+    prompt = f"""Forecast yield for urban {crop} farm:
+- Days elapsed: {days_elapsed}
+- Recent growth trajectory: {trajectory_str}
+- Setting: Indian rooftop vertical farm, organic inputs
+
+Provide yield projection with market valuation in INR."""
+    
+    response = client.chat.completions.create(
+        model=SUPPORTED_MODEL,
+        temperature=0.3,
+        max_completion_tokens=800,
+        response_format={"type": "json_schema", "json_schema": {"name": "yield_forecast", "schema": schema}},
+        messages=[{"role": "user", "content": prompt}]
+    )
+    raw = response.choices[0].message.content
+    if not raw:
+        raise GroqPlaybookError("Yield forecast response missing")
+    return json.loads(raw)
+
+
+def fetch_roi_analysis(crop: str, setup_cost_inr: float, monthly_opex_inr: float, projected_yield_kg: float) -> Dict[str, Any]:
+    """Generate ROI analysis with business model recommendations."""
+    client = _client()
+    schema = {
+        "type": "object",
+        "properties": {
+            "revenue_estimate_inr": {"type": "number"},
+            "net_profit_inr": {"type": "number"},
+            "roi_percentage": {"type": "number"},
+            "payback_months": {"type": "number"},
+            "business_models": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "model": {"type": "string"},
+                        "target_segment": {"type": "string"},
+                        "revenue_potential": {"type": "string"}
+                    },
+                    "required": ["model", "target_segment", "revenue_potential"],
+                    "additionalProperties": False
+                },
+                "minItems": 3,
+                "maxItems": 6
+            },
+            "scaling_strategies": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 2,
+                "maxItems": 5
+            },
+            "risk_mitigation": {"type": "string"}
+        },
+        "required": ["revenue_estimate_inr", "net_profit_inr", "roi_percentage", "payback_months", "business_models", "scaling_strategies", "risk_mitigation"],
+        "additionalProperties": False
+    }
+    
+    prompt = f"""Calculate ROI for urban {crop} farm in India:
+- Initial setup: ₹{setup_cost_inr:,.0f}
+- Monthly operating costs: ₹{monthly_opex_inr:,.0f}
+- Projected yield: {projected_yield_kg} kg/cycle
+
+Provide comprehensive financial analysis with entrepreneurship strategies."""
+    
+    response = client.chat.completions.create(
+        model=SUPPORTED_MODEL,
+        temperature=0.3,
+        max_completion_tokens=1000,
+        response_format={"type": "json_schema", "json_schema": {"name": "roi_analysis", "schema": schema}},
+        messages=[{"role": "user", "content": prompt}]
+    )
+    raw = response.choices[0].message.content
+    if not raw:
+        raise GroqPlaybookError("ROI analysis response missing")
+    return json.loads(raw)
+
+
+__all__ = [
+    "fetch_playbooks", "fetch_diagnosis", "fetch_yield_forecast", "fetch_roi_analysis",
+    "PlaybookRequest", "GroqPlaybookError", "SUPPORTED_MODEL"
+]

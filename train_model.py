@@ -6,6 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, mean_squared_error, r2_score
 import joblib
 import os
+from generate_data import CROP_PROFILES
 
 DATA_FILE = "simulated_farm_data.csv"
 IRR_MODEL_FILE = "irrigation_model.joblib"
@@ -21,10 +22,25 @@ def load_data(filename=DATA_FILE):
 def preprocess(df):
     df2 = df.copy()
 
+    # Feature engineering for better predictions
+    df2['moisture_deviation'] = abs(df2['moisture'] - df2.apply(
+        lambda r: CROP_PROFILES.get(r['crop'], {}).get('ideal_moisture', 60), axis=1
+    ))
+    df2['light_deviation'] = abs(df2['light_hours'] - df2.apply(
+        lambda r: CROP_PROFILES.get(r['crop'], {}).get('ideal_light', 10), axis=1
+    ))
+    df2['temp_stress'] = abs(df2['temperature'] - 25)
+    df2['nutrient_ratio'] = df2['nutrients'] / 100.0
+    df2['moisture_x_nutrients'] = df2['moisture'] * df2['nutrients'] / 100
+    
     # One-hot encode crop and stage
     df2 = pd.get_dummies(df2, columns=["crop", "stage"], drop_first=True)
 
-    feature_cols = ["moisture", "nutrients", "light_hours", "temperature"]
+    feature_cols = [
+        "moisture", "nutrients", "light_hours", "temperature",
+        "moisture_deviation", "light_deviation", "temp_stress", 
+        "nutrient_ratio", "moisture_x_nutrients", "day"
+    ]
     feature_cols += [c for c in df2.columns if c.startswith("crop_") or c.startswith("stage_")]
 
     X = df2[feature_cols]
@@ -33,13 +49,13 @@ def preprocess(df):
 
 
 def train_irrigation_model(X, y):
-    model = RandomForestClassifier(n_estimators=120, random_state=42)
+    model = RandomForestClassifier(n_estimators=200, max_depth=15, min_samples_split=3, random_state=42)
     model.fit(X, y)
     return model
 
 
 def train_growth_model(X, y):
-    model = RandomForestRegressor(n_estimators=140, random_state=42)
+    model = RandomForestRegressor(n_estimators=250, max_depth=20, min_samples_split=3, random_state=42)
     model.fit(X, y)
     return model
 

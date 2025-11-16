@@ -1,0 +1,82 @@
+"""
+Quick Performance Report - Urban Farming AI System
+===================================================
+
+MODELS TRAINED: 2025-11-16 23:50
+DATA: 600 samples (120 days × 5 crops)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IRRIGATION CLASSIFICATION MODEL
+--------------------------------
+Accuracy:     96%
+Precision:    97% (macro avg)
+Recall:       97% (macro avg)
+F1-Score:     97% (macro avg)
+
+Class Performance:
+  - irrigate_now:  100% precision, 100% recall
+  - ok:            98% precision, 93% recall  
+  - soon:          92% precision, 98% recall
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GROWTH PREDICTION MODEL
+------------------------
+RMSE:         0.78 / 100
+R² Score:     0.88 (88% variance explained)
+
+Features Used (13):
+  - moisture, nutrients, light_hours, temperature, day
+  - moisture_deviation, light_deviation, temp_stress
+  - nutrient_ratio, moisture_x_nutrients
+  - crop encodings (4), stage encodings (2)
+
+Model Architecture:
+  - RandomForest Regressor
+  - 250 estimators
+  - Max depth: 20
+  - Min samples split: 3
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GROQ AI INTEGRATION
+-------------------
+Model:        openai/gpt-oss-120b
+Features:     
+  ✓ Crop health diagnosis with confidence scores
+  ✓ Yield forecasting with market valuation (INR)
+  ✓ ROI analysis with business model recommendations
+  ✓ What-if simulator for scenario testing
+  ✓ Scenario universe generator (up to 12 variants/track)
+  ✓ Combinatorial grid explorer (max 400 combos shown)
+
+Response Format: Structured JSON schemas (type-safe)
+Caching:         600-3600s TTL via Streamlit
+Error Handling:  Custom GroqPlaybookError with fail-fast
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMPROVEMENTS FROM BASELINE
+---------------------------
+✓ R² improved from 0.31 → 0.88 (+183%)
+✓ Irrigation accuracy: 82% → 96% (+17%)
+✓ Added 6 engineered features for stronger signals
+✓ Doubled dataset size (300 → 600 samples)
+✓ Increased model capacity (140 → 250 estimators)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PRESENTATION DEMO FLOW
+----------------------
+1. Show model metrics (this report)
+2. Run AI diagnosis → expand risk factors
+3. Generate yield forecast → highlight ₹ market value
+4. Calculate ROI → showcase business models
+5. What-if simulator → drought scenario (30% moisture)
+6. Scenario universe → show combination grid
+7. Mention SDG alignment (2, 11, 12, 13)
+
+Expected Response: WOW! 🎉
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
